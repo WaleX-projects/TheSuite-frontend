@@ -25,10 +25,13 @@ export default function DashboardPage() {
         const [emp, leave, payroll] = await Promise.all([
           employeesApi.list(), leaveApi.list(), payrollApi.list(),
         ]);
-        let companies = { data: [] as any[] };
-        if (isSuperAdmin) companies = await companiesApi.list();
+        let companiesData: any[] = [];
+        if (isSuperAdmin) {
+          const companies = await companiesApi.list();
+          companiesData = Array.isArray(companies.data) ? companies.data : companies.data.results || [];
+        }
 
-        const empList = Array.isArray(emp.data) ? emp.data : emp.data.results || [];
+        const empList = Array.isArray(emp.data) ? emp.data : (emp.data as any).results || [];
         const leaveList = Array.isArray(leave.data) ? leave.data : leave.data.results || [];
         const payrollList = Array.isArray(payroll.data) ? payroll.data : payroll.data.results || [];
         const compList = Array.isArray(companies.data) ? companies.data : companies.data.results || [];
