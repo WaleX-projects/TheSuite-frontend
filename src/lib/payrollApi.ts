@@ -11,9 +11,7 @@ export const payrollApi = {
   run: (data: { company: string; month: number; year: number }) =>
     api.post("/payrolls/run/", data),
     
-  listEmployeepayslip: (employeeId: string) =>
-    api.get(`/employees/${employeeId}/payslips/`),
-
+  
   process: (id: string) =>
     api.post(`/payrolls/${id}/process/`),
 

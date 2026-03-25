@@ -7,10 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { User, Briefcase, Phone, Mail, MapPin, Calendar, Building2, DollarSign, Download } from "lucide-react";
+import { User, X , Briefcase, Phone, Mail, MapPin, Calendar, Building2, DollarSign, Download } from "lucide-react";
 import { toast } from "sonner";
 import { dateToWords } from "@/lib/utils";
-import { payrollApi } from "@/lib/payrollApi";
+//import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 const statusColor = (s: string) => {
   switch (s?.toLowerCase()) {
     case "present": return "bg-success/10 text-success border-success/20";
@@ -66,7 +67,8 @@ const [payslip ,setPayslip] = useState<any[]>([]);
  const handleEmployeepayslips = async () => {
   try {
     
-    const { data } = await payrollApi.listEmployeepayslip(id);
+    const { data } = await employeesApi.listEmployeepayslip(id);
+    
     console.log("data",data)
 setPayslip(Array.isArray(data) ? data : data.results || []);
   } catch {
@@ -80,7 +82,16 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
 
   return (
     <div className="space-y-6">
-      <h1 className="page-header">{employee.first_name} {employee.last_name}</h1>
+    
+      <div className="flex items-center justify-between">
+      
+            <h1 className="page-header">{employee.first_name} {employee.last_name}</h1>
+            <Button className="bg-red-600 hover:bg-red-400">
+              <X className="mr-2 h-4 w-4" />
+              Deactivate employee
+            </Button>
+            
+      </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList>
@@ -125,6 +136,56 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
                 <div><span className="text-muted-foreground">Relation</span><p className="font-medium">{employee.emergency_contact_relation || "—"}</p></div>
               </CardContent>
             </Card>
+            
+            <Card>
+  <CardHeader>
+    <CardTitle className="text-base flex items-center gap-2">
+      <DollarSign className="h-4 w-4 text-primary" />
+      Account Information
+    </CardTitle>
+  </CardHeader>
+
+  <CardContent className="space-y-3 text-sm">
+    <div>
+      <span className="text-muted-foreground">Bank Name</span>
+      <p className="font-medium">
+        {employee.bank_name || "First Bank of Nigeria"}
+      </p>
+    </div>
+
+    <div>
+      <span className="text-muted-foreground">Account Name</span>
+      <p className="font-medium">
+        {employee.bank_account_name ||
+          `${employee.first_name} ${employee.last_name}`}
+      </p>
+    </div>
+
+    <div>
+      <span className="text-muted-foreground">Account Number</span>
+      <p className="font-medium tracking-widest">
+        {employee.bank_account_number
+          ? "****" + employee.bank_account_number.slice(-4)
+          : "****6789"}
+      </p>
+    </div>
+
+    <div>
+      <span className="text-muted-foreground">Account Type</span>
+      <p className="font-medium">
+        {employee.bank_account_type || "Savings"}
+      </p>
+    </div>
+
+    <div>
+      <span className="text-muted-foreground">Currency</span>
+      <p className="font-medium">
+        {employee.currency || "NGN"}
+      </p>
+    </div>
+  </CardContent>
+</Card>
+
           </div>
         </TabsContent>
 
@@ -198,8 +259,8 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
         <TabsContent value="payslip">
           <div className="grid gap-4 sm:grid-cols-3 mb-6">
             {[
-              { label: "Total Earned (YTD)", value: `$${payslip.reduce((s: number, p: any) => s + parseFloat(p.net_pay || p.amount || 0), 0).toLocaleString()}` },
-              { label: "Last Salary", value: payslip.length > 0 ? `$${parseFloat(payslip[payslip.length - 1].net_pay || payslip[payslip.length - 1].amount || 0).toLocaleString()}` : "—" },
+              { label: "Total Earned (YTD)", value: `$${payslip.reduce((s: number, p: any) => s + parseFloat(p.net_salary || p.amount || 0), 0).toLocaleString()}` },
+              { label: "Last Salary", value: payslip.length > 0 ? `$${parseFloat(payslip[payslip.length - 1].net_salary|| payslip[payslip.length - 1].amount || 0).toLocaleString()}` : "—" },
               { label: "Records", value: payslip.length },
             ].map((s) => (
               <Card key={s.label} className="stat-card">
@@ -226,12 +287,12 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
                 <TableBody>
                   {payslip.map((p: any, i: number) => (
                     <TableRow key={i}>
-                      <TableCell>{p.period || p.date || "—"}</TableCell>
+                      <TableCell>{p.payroll_month} /{p.payroll_year}</TableCell>
                       <TableCell>${parseFloat(p.basic_salary || p.amount || 0).toLocaleString()}</TableCell>
-                      <TableCell>${parseFloat(p.allowances || 0).toLocaleString()}</TableCell>
-                      <TableCell>${parseFloat(p.deductions || 0).toLocaleString()}</TableCell>
-                      <TableCell className="font-semibold">${parseFloat(p.net_pay || p.amount || 0).toLocaleString()}</TableCell>
-                      <TableCell><Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status || "—"}</Badge></TableCell>
+                      <TableCell className="text-green-600">${parseFloat(p.total_allowance || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-red-600">${parseFloat(p.total_deduction || 0).toLocaleString()}</TableCell>
+                      <TableCell className="font-semibold">${parseFloat(p.net_salary || p.amount || 0).toLocaleString()}</TableCell>
+                      <TableCell><Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.payroll_status|| "—"}</Badge></TableCell>
                     </TableRow>
                   ))}
                   {payslip.length === 0 && (

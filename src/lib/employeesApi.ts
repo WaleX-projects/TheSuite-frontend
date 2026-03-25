@@ -6,6 +6,9 @@ export const employeesApi = {
   create: (data: any) => api.post("/employees/", data),
   update: (id: number, data: any) => api.put(`/employees/${id}/`, data),
   deactivate: (id: number) => api.delete(`/employees/${id}/deactivate`),
+  listEmployeepayslip: (employeeId: string) =>
+    api.get(`/employees/${employeeId}/payslips/`),
+    
 };
 
 export const departmentListApi = {
