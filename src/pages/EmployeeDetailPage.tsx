@@ -69,13 +69,24 @@ const [payslip ,setPayslip] = useState<any[]>([]);
     
     const { data } = await employeesApi.listEmployeepayslip(id);
     
-    console.log("data",data)
+    
 setPayslip(Array.isArray(data) ? data : data.results || []);
   } catch {
     toast.error("Failed to load payslips");
   }
 };
 
+
+// handling deactivation of employees 
+const handleDeactivate = async () => {
+  try {
+    await employeesApi.deactivate(id);
+    toast.success("Employee deactivated");
+    loadEmployees();
+  } catch {
+    toast.error("Failed to deactivate employee");
+  }
+};
 
   const leaves = employee.leave || employee.leaves || [];
   
@@ -86,10 +97,22 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
       <div className="flex items-center justify-between">
       
             <h1 className="page-header">{employee.first_name} {employee.last_name}</h1>
-            <Button className="bg-red-600 hover:bg-red-400">
-              <X className="mr-2 h-4 w-4" />
-              Deactivate employee
-            </Button>
+                    {employee.status === "active" ? (
+        <Button
+            onClick={() => handleDeactivate(e.id)}
+            className="bg-red-600 hover:bg-red-400"
+        >
+            <X className="mr-2 h-4 w-4" />
+            Deactivate Employee
+        </Button>
+        ) : (
+        <Button
+            onClick={() => handleActivate(e.id)}
+            className="bg-green-600 hover:bg-green-400"
+        >
+            Activate Employee
+        </Button>
+        )}
             
       </div>
 
@@ -123,7 +146,7 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
                 <div><span className="text-muted-foreground">Position</span><p className="font-medium">{employee.position_detail || "—"}</p></div>
                 <div><span className="text-muted-foreground">Hire Date</span><p className="font-medium">{employee.hire_date || "—"}</p></div>
                 <div><span className="text-muted-foreground">Status</span>
-                  <Badge variant={employee.is_active !== false ? "default" : "secondary"}>{employee.is_active !== false ? "Active" : "Inactive"}</Badge>
+                  <Badge variant={employee.active !== "active"? "default" : "secondary"}>{employee.status === "active" ? "Active" : "Inactive"}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -146,41 +169,39 @@ setPayslip(Array.isArray(data) ? data : data.results || []);
   </CardHeader>
 
   <CardContent className="space-y-3 text-sm">
+  
     <div>
       <span className="text-muted-foreground">Bank Name</span>
       <p className="font-medium">
-        {employee.bank_name || "First Bank of Nigeria"}
+        {employee.bank_name || "-"}
       </p>
     </div>
 
     <div>
       <span className="text-muted-foreground">Account Name</span>
       <p className="font-medium">
-        {employee.bank_account_name ||
-          `${employee.first_name} ${employee.last_name}`}
+        {employee.bank_account_name || "-"}
       </p>
     </div>
 
     <div>
       <span className="text-muted-foreground">Account Number</span>
       <p className="font-medium tracking-widest">
-        {employee.bank_account_number
-          ? "****" + employee.bank_account_number.slice(-4)
-          : "****6789"}
+        {employee.masked_account_number}
       </p>
     </div>
 
     <div>
       <span className="text-muted-foreground">Account Type</span>
       <p className="font-medium">
-        {employee.bank_account_type || "Savings"}
+        {employee.bank_account_type || "-"}
       </p>
     </div>
 
     <div>
       <span className="text-muted-foreground">Currency</span>
       <p className="font-medium">
-        {employee.currency || "NGN"}
+        {employee.currency || "-"}
       </p>
     </div>
   </CardContent>

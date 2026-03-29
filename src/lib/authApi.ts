@@ -8,6 +8,7 @@ export const authApi = {
     company_data: { name: string; address: string; industry?: string; country: string; timezone: string };
   }) => api.post("/accounts/register/", data),
   getProfile: () => api.get("/accounts/profile/"),
+  verifyAccount :  (token:string)=> api.get(`/accounts/verify/${token}/`),
   resetPasswordRequest: (email: string) =>
     api.post("/accounts/reset-password-request/", { email }),
   resetPassword: (token: string, password: string) =>

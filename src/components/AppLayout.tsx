@@ -1,24 +1,41 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  LayoutDashboard, Building2, Users, CalendarCheck, CalendarOff,
-  DollarSign, CreditCard, Bell, User, LogOut, Menu, X, Briefcase
-} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  CalendarCheck,
+  CalendarOff,
+  DollarSign,
+  CreditCard,
+  Bell,
+  Network,
+  User,
+  LogOut,
+  Menu,
+  X,
+  Briefcase
+} from "lucide-react";
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/companies", label: "Companies", icon: Building2, superOnly: true },
+
+  // 👇 ADD THIS
+  { to: "/organization", label: "Organization", icon: Network },
+
   { to: "/employees", label: "Employees", icon: Users },
   { to: "/attendance", label: "Attendance", icon: CalendarCheck },
-  { to: "/leave", label: "Leave", icon: CalendarOff },
+  { to: "/leave", label: "Leave", icon: CalendarOff,superOnly: true  },
   { to: "/payroll", label: "Payroll", icon: DollarSign },
-  { to: "/subscriptions", label: "Subscriptions", icon: CreditCard },
-  { to: "/notifications", label: "Notifications", icon: Bell },
+  { to: "/subscriptions", label: "Subscriptions", icon: CreditCard,superOnly: true },
+  { to: "/notifications", label: "Notifications", icon: Bell,superOnly: true  },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
