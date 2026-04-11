@@ -23,11 +23,13 @@ export const employeesApi = {
 
   create: (data: any) => api.post("/employees/", data),
 
-  update: (id: number, data: any) =>
+  update: (id: string, data: any) =>
     api.put(`/employees/${id}/`, data),
 
   deactivate: (id: string) =>
     api.patch(`/employees/${id}/deactivate/`),
+    activate: (id: string) =>
+    api.patch(`/employees/${id}/activate/`),
 
   listEmployeepayslip: (employeeId: string) =>
     api.get(`/employees/${employeeId}/payslips/`),
@@ -42,6 +44,16 @@ export const employeesApi = {
     api.get("/employees/resolve-account/", {
       params: { bank_code, account_number },
     }),
+    
+   // In your API.ts
+bulkCreate: (formData: FormData) =>
+  api.post("/bulk/", formData, {
+    headers: {
+      // Set to undefined so the browser can auto-detect and add the boundary
+      "Content-Type": undefined, 
+    },
+  }),
+
 };
 
 
@@ -49,6 +61,12 @@ export const departmentApi = {
   list: () => api.get("/department/"),
   create: (data: { name: string }) =>
     api.post("/department/", data),
+    
+   delete: ( id: string ) =>
+    api.delete(`/department/${id}/`),
+    
+   update :(id:string, data: { name: string }) =>
+    api.patch(`/department/${id}/`, data),
 };
 
 export const positionApi = {
@@ -58,4 +76,6 @@ export const positionApi = {
   list: () => api.get("/position/"),
   create: (data: any) =>
   api.post("/position/", data),
+  update: (id:string, payload)=> api.put(`/position/${id}/`,payload),
+  delete:(id:string)=>api.delete(`/position/${id}/`)
 };

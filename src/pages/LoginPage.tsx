@@ -20,12 +20,27 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
-      toast.success("Welcome back!");
+    const response =  await login(email, password);
+      toast.success(response.message);
       navigate("/dashboard");
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Invalid credentials");
-    } finally {
+        //check if backend reponse with error
+        
+        if (err.response && err.response.data){
+            const backendError = err.response.data.error
+            toast.error(backendError);
+            
+            
+            }
+            else if (err.request) {
+      toast.error("Server is unreachable. Check your connection.");
+    } 
+    // 3. Something else happened
+    else {
+      toast.error("Unexpected error: " + err.message);
+    }
+            
+          } finally {
       setLoading(false);
     }
   };

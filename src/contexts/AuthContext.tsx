@@ -56,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem("access_token", data.access);
     localStorage.setItem("refresh_token", data.refresh);
     await fetchProfile();
+    return data
   };
 
   const logout = () => {

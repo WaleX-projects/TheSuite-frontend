@@ -22,6 +22,10 @@ export const attendanceApi = {
       params,
     });
   },
+  
+  
+  dashboard:()=> api.get('/attendance/dashboard/'),
+  
 };
 
 

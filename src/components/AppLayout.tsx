@@ -29,7 +29,8 @@ import {
   LogOut,
   Menu,
   X,
-  Briefcase
+  Briefcase,
+  Settings 
 } from "lucide-react";
 
 const navItems = [
@@ -41,7 +42,10 @@ const navItems = [
   { to: "/leave", label: "Leave", icon: CalendarOff },
   { to: "/payroll", label: "Payroll", icon: DollarSign },
   { to: "/subscriptions", label: "Subscriptions", icon: CreditCard},
-  { to: "/notifications", label: "Notifications", icon: Bell, superOnly: true },
+    { to: "/notifications", label: "Notifications", icon: Bell, superOnly: true },
+  
+  { to: "/settings", label: "Settings", icon: Settings},
+ 
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
