@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { leaveApi } from "@/lib/leaveApi";
+import { useEffect, useState, useCallback } from "react";
+import { leaveApi, LeaveRequest, LeaveType } from "@/lib/leaveApi";
 import { employeesApi } from "@/lib/employeesApi";
 
 import {
@@ -8,12 +8,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import {
   Dialog,
@@ -33,19 +38,15 @@ import {
 } from "@/components/ui/table";
 
 import { Badge } from "@/components/ui/badge";
-import { Plus, Check, X, Search, Filter } from "lucide-react";
+import { Plus, Check, X, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const statusVariant = (status: string) => {
   switch (status?.toLowerCase()) {
-    case "approved":
-      return "default";
-    case "rejected":
-      return "destructive";
-    case "pending":
-      return "secondary";
-    default:
-      return "outline";
+    case "approved": return "default";
+    case "rejected": return "destructive";
+    case "pending": return "secondary";
+    default: return "outline";
   }
 };
 
@@ -59,12 +60,14 @@ const statusColor = (status: string) => {
 };
 
 export default function LeavePage() {
-  const [leaves, setLeaves] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [summary, setSummary] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [open, setOpen] = useState(false);
 
   // Filters
@@ -72,59 +75,106 @@ export default function LeavePage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [employeeFilter, setEmployeeFilter] = useState("all");
 
+  // Pagination for employees (if your employeesApi supports page param)
+  const [employeePage, setEmployeePage] = useState(1);
+  const [hasMoreEmployees, setHasMoreEmployees] = useState(true);
+
   const [form, setForm] = useState({
     employee: "",
+    leave_type: "",
     start_date: "",
     end_date: "",
     reason: "",
   });
 
-  // ================= FETCH DATA =================
-  const fetchData = async () => {
+  // Fetch initial data
+  const fetchInitialData = useCallback(async () => {
     setLoading(true);
     try {
-      const [leaveRes, empRes] = await Promise.all([
+      const [leaveRes, leaveTypeRes] = await Promise.all([
         leaveApi.list(),
-        employeesApi.list(),
+        leaveApi.listLeaveTypes(),
       ]);
 
       setLeaves(leaveRes.data?.results || leaveRes.data || []);
-      setEmployees(empRes.data?.results || empRes.data || []);
+      setLeaveTypes(leaveTypeRes.data?.results || leaveTypeRes.data || []);
 
-      // Summary (if your API supports it)
-      if (leaveApi.summary) {
+      // Fetch summary if endpoint exists
+      try {
         const sumRes = await leaveApi.summary();
         setSummary(sumRes.data || []);
+      } catch (e) {
+        // Summary optional
       }
     } catch (error) {
       toast.error("Failed to load leave data");
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Load employees with pagination
+  const fetchEmployees = async (page: number = 1) => {
+    if (loadingEmployees) return;
+    setLoadingEmployees(true);
+
+    try {
+      const res = await employeesApi.list({ params: { page } });
+      const newEmployees = res.data?.results || res.data || [];
+
+      if (page === 1) {
+        setEmployees(newEmployees);
+      } else {
+        setEmployees((prev) => [...prev, ...newEmployees]);
+      }
+
+      setHasMoreEmployees(!!res.data?.next);
+      setEmployeePage(page);
+    } catch (error) {
+      toast.error("Failed to load employees");
+    } finally {
+      setLoadingEmployees(false);
+    }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchInitialData();
+    fetchEmployees(1);
+  }, [fetchInitialData]);
+
+  // Load more employees (infinite scroll style - you can also use a "Load More" button)
+  const loadMoreEmployees = () => {
+    if (hasMoreEmployees) fetchEmployees(employeePage + 1);
+  };
 
   // Filtered leaves
   const filteredLeaves = leaves
     .filter((leave) => {
       const matchesSearch =
-        leave.employee_name?.toLowerCase().includes(search.toLowerCase()) ||
-        leave.reason?.toLowerCase().includes(search.toLowerCase());
+        (leave.employee_name || "").toLowerCase().includes(search.toLowerCase()) ||
+        leave.reason.toLowerCase().includes(search.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || leave.status?.toLowerCase() === statusFilter;
-      const matchesEmployee = employeeFilter === "all" || leave.employee?.toString() === employeeFilter;
+      const matchesStatus = statusFilter === "all" || leave.status.toLowerCase() === statusFilter;
+      const matchesEmployee = employeeFilter === "all" || leave.employee.toString() === employeeFilter;
 
       return matchesSearch && matchesStatus && matchesEmployee;
     })
     .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 
-  // ================= FORM VALIDATION =================
-  const isFormValid = form.employee && form.start_date && form.end_date && form.reason.trim().length > 5;
+  const calculateDays = (start: string, end: string) => {
+    const s = new Date(start);
+    const e = new Date(end);
+    return Math.ceil((e.getTime() - s.getTime()) / (1000 * 3600 * 24)) + 1;
+  };
 
-  // ================= APPLY LEAVE =================
+  const isFormValid =
+    form.employee &&
+    form.leave_type &&
+    form.start_date &&
+    form.end_date &&
+    form.reason.trim().length > 5 &&
+    new Date(form.end_date) >= new Date(form.start_date);
+
   const handleApply = async () => {
     if (!isFormValid) {
       toast.error("Please fill all fields correctly. Reason must be at least 5 characters.");
@@ -132,42 +182,37 @@ export default function LeavePage() {
     }
 
     setSubmitting(true);
-
     try {
       await leaveApi.create(form);
 
       toast.success("Leave request submitted successfully!");
-
-      // Reset form and close dialog
-      setForm({ employee: "", start_date: "", end_date: "", reason: "" });
+      setForm({ employee: "", leave_type: "", start_date: "", end_date: "", reason: "" });
       setOpen(false);
-
-      fetchData(); // Refresh list
+      fetchInitialData(); // Refresh list
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Failed to submit leave request");
+      toast.error(error?.response?.data?.detail || "Failed to submit leave request");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ================= UPDATE STATUS =================
-  const handleStatus = async (id: string, status: string) => {
+  const handleStatusUpdate = async (id: string, status: "approved" | "rejected") => {
     try {
-      await leaveApi.update(id, { status });
-      toast.success(`Leave request ${status.toLowerCase()} successfully`);
-      fetchData();
+      await leaveApi.updateStatus(id, status);
+      toast.success(`Leave request ${status} successfully`);
+      fetchInitialData();
     } catch {
-      toast.error(`Failed to ${status.toLowerCase()} leave request`);
+      toast.error(`Failed to ${status} leave request`);
     }
   };
 
   return (
     <div className="space-y-6 p-6">
-      {/* HEADER */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Leave Management</h1>
-          <p className="text-sm text-gray-500">Manage all employee leave requests</p>
+          <p className="text-sm text-gray-500">Manage employee leave requests</p>
         </div>
 
         <Dialog open={open} onOpenChange={setOpen}>
@@ -184,6 +229,7 @@ export default function LeavePage() {
             </DialogHeader>
 
             <div className="space-y-5 pt-4">
+              {/* Employee Select */}
               <div>
                 <Label>Select Employee</Label>
                 <Select value={form.employee} onValueChange={(val) => setForm({ ...form, employee: val })}>
@@ -196,16 +242,40 @@ export default function LeavePage() {
                         {emp.first_name} {emp.last_name}
                       </SelectItem>
                     ))}
+                    {hasMoreEmployees && (
+                      <SelectItem value="load-more" onClick={loadMoreEmployees} disabled={loadingEmployees}>
+                        {loadingEmployees ? "Loading..." : "Load more employees..."}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Leave Type */}
+              <div>
+                <Label>Leave Type</Label>
+                <Select value={form.leave_type} onValueChange={(val) => setForm({ ...form, leave_type: val })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select leave type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leaveTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name} ({type.days_allowed} days allowed)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Start Date</Label>
                   <Input
                     type="date"
                     value={form.start_date}
+                    min={new Date().toISOString().split("T")[0]}
                     onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                   />
                 </div>
@@ -214,6 +284,7 @@ export default function LeavePage() {
                   <Input
                     type="date"
                     value={form.end_date}
+                    min={form.start_date || new Date().toISOString().split("T")[0]}
                     onChange={(e) => setForm({ ...form, end_date: e.target.value })}
                   />
                 </div>
@@ -222,7 +293,7 @@ export default function LeavePage() {
               <div>
                 <Label>Reason for Leave</Label>
                 <Textarea
-                  placeholder="Briefly explain the reason for your leave request..."
+                  placeholder="Explain the reason for your leave request..."
                   value={form.reason}
                   onChange={(e) => setForm({ ...form, reason: e.target.value })}
                   rows={4}
@@ -234,23 +305,30 @@ export default function LeavePage() {
                 onClick={handleApply}
                 disabled={!isFormValid || submitting}
               >
-                {submitting ? "Submitting Request..." : "Submit Leave Request"}
+                {submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Leave Request"
+                )}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* SUMMARY CARDS */}
+      {/* Summary Cards */}
       {summary.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {summary.map((s, index) => (
-            <Card key={index}>
+          {summary.map((s, i) => (
+            <Card key={i}>
               <CardContent className="p-6">
-                <p className="text-sm text-gray-500">{s.leave_type}</p>
+                <p className="text-sm text-gray-500">{s.leave_type || s.name}</p>
                 <p className="text-3xl font-bold mt-2">{s.remaining} days</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  {s.used} used • {s.total} total
+                  {s.used} used • {s.total || s.days_allowed} total
                 </p>
               </CardContent>
             </Card>
@@ -258,7 +336,7 @@ export default function LeavePage() {
         </div>
       )}
 
-      {/* FILTERS */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-3">
@@ -301,7 +379,7 @@ export default function LeavePage() {
         </CardContent>
       </Card>
 
-      {/* LEAVE TABLE */}
+      {/* Leave Table */}
       <Card>
         <CardHeader>
           <CardTitle>Leave Requests ({filteredLeaves.length})</CardTitle>
@@ -311,6 +389,7 @@ export default function LeavePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
+                <TableHead>Leave Type</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
                 <TableHead>Days</TableHead>
@@ -322,21 +401,20 @@ export default function LeavePage() {
 
             <TableBody>
               {filteredLeaves.map((leave) => {
-                const start = new Date(leave.start_date);
-                const end = new Date(leave.end_date);
-                const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+                const days = calculateDays(leave.start_date, leave.end_date);
 
                 return (
                   <TableRow key={leave.id}>
                     <TableCell className="font-medium">
-                      {leave.employee_name || `${leave.employee_first_name || ""} ${leave.employee_last_name || ""}`}
+                      {leave.employee_name || "Unknown Employee"}
                     </TableCell>
+                    <TableCell>{leave.leave_type_name || "—"}</TableCell>
                     <TableCell>{leave.start_date}</TableCell>
                     <TableCell>{leave.end_date}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{days} day{days > 1 ? "s" : ""}</Badge>
+                      <Badge variant="outline">{days} day{days !== 1 ? "s" : ""}</Badge>
                     </TableCell>
-                    <TableCell className="max-w-[280px] truncate" title={leave.reason}>
+                    <TableCell className="max-w-[300px] truncate" title={leave.reason}>
                       {leave.reason}
                     </TableCell>
                     <TableCell>
@@ -345,12 +423,12 @@ export default function LeavePage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {leave.status?.toLowerCase() === "pending" && (
+                      {leave.status.toLowerCase() === "pending" && (
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleStatus(leave.id, "approved")}
+                            onClick={() => handleStatusUpdate(leave.id, "approved")}
                             className="hover:bg-green-100 hover:text-green-600"
                           >
                             <Check className="h-4 w-4" />
@@ -358,7 +436,7 @@ export default function LeavePage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleStatus(leave.id, "rejected")}
+                            onClick={() => handleStatusUpdate(leave.id, "rejected")}
                             className="hover:bg-red-100 hover:text-red-600"
                           >
                             <X className="h-4 w-4" />
@@ -370,10 +448,10 @@ export default function LeavePage() {
                 );
               })}
 
-              {filteredLeaves.length === 0 && (
+              {filteredLeaves.length === 0 && !loading && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-12 text-gray-500">
-                    {loading ? "Loading leave requests..." : "No leave requests found matching your filters."}
+                  <TableCell colSpan={8} className="text-center py-12 text-gray-500">
+                    No leave requests found.
                   </TableCell>
                 </TableRow>
               )}
