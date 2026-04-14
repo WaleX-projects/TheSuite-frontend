@@ -44,8 +44,11 @@ export const leaveApi = {
   }) => api.post<LeaveRequest>("/leave/", data),
 
   updateStatus: (id: string, status: "approved" | "rejected") =>
-    api.put(`/leave/${id}/`, { status }),
+    api.post(`/leave/${id}/${status}/`),   // Use the new actions
 
+  // Or keep using PUT if you prefer
+  // updateStatus: (id: string, status: "approved" | "rejected") =>
+  //   api.put(`/leave/${id}/`, { status }),
   listLeaveTypes: () => api.get<LeaveType[]>("/leave-types/"),
 
   // Optional: Summary (per employee or overall - adjust endpoint as needed)
