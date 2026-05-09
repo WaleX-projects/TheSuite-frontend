@@ -95,7 +95,10 @@ export default function LeavePage() {
         leaveApi.list(),
         leaveApi.listLeaveTypes(),
       ]);
-
+        
+        console.log("leave data", leaveRes);
+        console.log("leavetype data", leaveTypeRes)
+        
       setLeaves(leaveRes.data?.results || leaveRes.data || []);
       setLeaveTypes(leaveTypeRes.data?.results || leaveTypeRes.data || []);
 
@@ -428,7 +431,7 @@ export default function LeavePage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleStatusUpdate(leave.id, "approved")}
+                            onClick={() => handleStatusUpdate(leave.id, "approve")}
                             className="hover:bg-green-100 hover:text-green-600"
                           >
                             <Check className="h-4 w-4" />
@@ -436,7 +439,7 @@ export default function LeavePage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleStatusUpdate(leave.id, "rejected")}
+                            onClick={() => handleStatusUpdate(leave.id, "reject")}
                             className="hover:bg-red-100 hover:text-red-600"
                           >
                             <X className="h-4 w-4" />

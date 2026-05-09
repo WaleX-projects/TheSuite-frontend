@@ -78,3 +78,13 @@ export const positionApi = {
   update: (id:string, payload)=> api.put(`/position/${id}/`,payload),
   delete:(id:string)=>api.delete(`/position/${id}/`)
 };
+
+   // your axios instance
+
+export const salaryApi = {
+  getPositionSalaries: () => api.get("/position-salaries/"),
+  getEmployeeOverrides: () => api.get("/employee-salary-overrides/"),
+  getCompanyStructures: () => api.get("/company-salary-structures/"),
+  getPayslips: () => api.get("/payslips/"),
+  // add more endpoints as needed (e.g. detail views)
+};

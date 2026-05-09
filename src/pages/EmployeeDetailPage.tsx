@@ -2,6 +2,18 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { employeesApi } from "@/lib/employeesApi";
 import { attendanceApi } from "@/lib/attendanceApi";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import { 
   Card, CardContent, CardHeader, CardTitle 
 } from "@/components/ui/card";
@@ -20,7 +32,7 @@ import { toast } from "sonner";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 
-// New imports for Edit Modal
+// Edit Modal imports
 import {
   Dialog,
   DialogContent,
@@ -46,13 +58,17 @@ export default function EmployeeDetailPage() {
   const [editForm, setEditForm] = useState<any>({});
   const [updating, setUpdating] = useState(false);
 
+  // Load Employee Data
   const loadEmployee = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
       const { data } = await employeesApi.get(id);
+      
       setEmployee(data);
-      // Initialize edit form with current data
+      console.log("incoming data", data)
+
+      // Initialize edit form
       setEditForm({
         first_name: data.first_name || "",
         last_name: data.last_name || "",
@@ -60,13 +76,22 @@ export default function EmployeeDetailPage() {
         phone: data.phone || "",
         address: data.address || "",
         date_of_birth: data.date_of_birth || "",
-        position_detail: data.position_detail || "",
-        department_detail: data.department_detail || "",
         hire_date: data.hire_date || "",
+
+        // Critical: Use actual IDs for update
+        department: data.department_id || data.department?.id || "",
+        position: data.position_id || data.position?.id || "",
+
+        // Display names
+        department_detail: data.department_detail || data.department?.name || "",
+        position_detail: data.position_detail || data.position?.title || "",
+
+        // Bank Info
         bank_name: data.bank_name || "",
         bank_account_name: data.bank_account_name || "",
-        bank_account_number: data.bank_account_number || "", // if unmasked available
+        bank_account_number: data.masked_account_number || data.bank_account_number || "",
         bank_account_type: data.bank_account_type || "",
+        bank_code: data.bank_code || "",
         currency: data.currency || "",
       });
     } catch (err) {
@@ -111,12 +136,8 @@ export default function EmployeeDetailPage() {
         await employeesApi.deactivate(id);
         toast.success("Employee deactivated successfully");
       } else {
-        if (employeesApi.activate) {
-          await employeesApi.activate(id);
-          toast.success("Employee activated successfully");
-        } else {
-          throw new Error("Activate API not available");
-        }
+        await employeesApi.activate(id);
+        toast.success("Employee activated successfully");
       }
       await loadEmployee();
     } catch (err) {
@@ -131,13 +152,35 @@ export default function EmployeeDetailPage() {
 
     setUpdating(true);
     try {
-      await employeesApi.update(id, editForm);
+      const payload = {
+        first_name: editForm.first_name?.trim(),
+        last_name: editForm.last_name?.trim(),
+        email: editForm.email?.trim(),
+        phone: editForm.phone?.trim() || null,
+        address: editForm.address?.trim() || null,
+        date_of_birth: editForm.date_of_birth || null,
+        hire_date: editForm.hire_date || null,
+        department: editForm.department || null,
+        position: editForm.position || null,
+        bank_name: editForm.bank_name?.trim() || null,
+        bank_account_name: editForm.bank_account_name?.trim() || null,
+        bank_account_number: editForm.bank_account_number?.trim() || null,
+        bank_account_type: editForm.bank_account_type || null,
+        bank_code: editForm.bank_code?.trim() || null,
+        currency: editForm.currency || null,
+      };
+      console.log("payload", payload);
+      await employeesApi.update(id, payload);
+      
       toast.success("Employee details updated successfully");
       setIsEditModalOpen(false);
       await loadEmployee(); // Refresh data
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to update employee");
-      console.error(err);
+      console.error("Update error:", err.response?.data);
+      const errorMsg = err.response?.data?.message || 
+                      Object.values(err.response?.data || {})[0]?.[0] || 
+                      "Failed to update employee";
+      toast.error(errorMsg);
     } finally {
       setUpdating(false);
     }
@@ -151,13 +194,11 @@ export default function EmployeeDetailPage() {
     loadEmployee();
   }, [loadEmployee]);
 
-  // Calendar Events Logic (unchanged)
+  // Calendar Events
   const presentEvents = attendance.map((a: any) => {
     const clockIn = a.clock_in ? a.clock_in.substring(0, 5) : "—";
     const clockOut = a.clock_out ? a.clock_out.substring(0, 5) : "—";
-    const totalHrs = a.total_hours 
-      ? `${Number(a.total_hours).toFixed(1)} hrs` 
-      : "—";
+    const totalHrs = a.total_hours ? `${Number(a.total_hours).toFixed(1)} hrs` : "—";
     const title = `In: ${clockIn} | Out: ${clockOut} ${totalHrs}`;
 
     return {
@@ -166,12 +207,10 @@ export default function EmployeeDetailPage() {
       backgroundColor: a.status === "late" ? "#f59e0b" : "#10b981",
       textColor: "#ffffff",
       borderColor: "transparent",
-      extendedProps: { status: a.status },
     };
   });
 
   const absentEvents: any[] = [];
-
   if (attendance.length > 0) {
     const attendanceDates = new Set(attendance.map((a: any) => a.date));
     const dates = attendance.map((a: any) => new Date(a.date));
@@ -179,7 +218,6 @@ export default function EmployeeDetailPage() {
     const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
 
     const current = new Date(minDate);
-
     while (current <= maxDate) {
       const dateStr = current.toISOString().split("T")[0];
       const dayOfWeek = current.getDay();
@@ -198,7 +236,6 @@ export default function EmployeeDetailPage() {
   }
 
   const allCalendarEvents = [...presentEvents, ...absentEvents];
-
   const leaves = employee?.leave || employee?.leaves || [];
 
   if (loading) {
@@ -219,7 +256,7 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="space-y-8 p-6">
-      {/* Header - Edit button added here */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold tracking-tight">
@@ -240,19 +277,51 @@ export default function EmployeeDetailPage() {
             Edit Employee
           </Button>
 
-          <Button
-            onClick={handleToggleStatus}
-            variant={employee.status === "active" ? "destructive" : "default"}
-            className="flex items-center gap-2"
-          >
-            {employee.status === "active" ? (
-              <>
-                <X className="h-4 w-4" /> Deactivate Employee
-              </>
-            ) : (
-              <>Activate Employee</>
-            )}
-          </Button>
+        <AlertDialog>
+  <AlertDialogTrigger asChild>
+    <Button
+      variant={employee.status === "active" ? "destructive" : "default"}
+      className="flex items-center gap-2"
+    >
+      {employee.status === "active" ? (
+        <>
+          <X className="h-4 w-4" />
+          Deactivate Employee
+        </>
+      ) : (
+        <>Activate Employee</>
+      )}
+    </Button>
+  </AlertDialogTrigger>
+
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>
+        {employee.status === "active"
+          ? "Deactivate Employee"
+          : "Activate Employee"}
+      </AlertDialogTitle>
+
+      <AlertDialogDescription>
+        {employee.status === "active"
+          ? "This employee will no longer be able to participate in active operations such as attendance, payroll, and scheduling."
+          : "This employee will be restored to active operations including attendance and payroll."}
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+
+    <AlertDialogFooter>
+      <AlertDialogCancel>
+        Cancel
+      </AlertDialogCancel>
+
+      <AlertDialogAction onClick={handleToggleStatus}>
+        {employee.status === "active"
+          ? "Deactivate"
+          : "Activate"}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
         </div>
       </div>
 
@@ -264,9 +333,10 @@ export default function EmployeeDetailPage() {
           <TabsTrigger value="payslip" onClick={loadPayslips}>Payslips</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab - Unchanged */}
+        {/* Overview Tab */}
         <TabsContent value="overview">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Personal Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -297,37 +367,41 @@ export default function EmployeeDetailPage() {
               </CardContent>
             </Card>
 
+            {/* Bank Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-primary" />
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
                   Account Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div>
                   <span className="text-muted-foreground">Bank Name</span>
-                  <p className="font-medium">{employee.bank_name || "-"}</p>
+                  <p className="font-medium">{employee.bank_name || "—"}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Name</span>
-                  <p className="font-medium">{employee.bank_account_name || "-"}</p>
+                  <p className="font-medium">{employee.bank_account_name || "—"}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Number</span>
-                  <p className="font-medium tracking-widest">{employee.masked_account_number}</p>
+                  <p className="font-medium tracking-widest">
+                    {employee.masked_account_number || employee.bank_account_number || "—"}
+                  </p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Type</span>
-                  <p className="font-medium">{employee.bank_account_type || "-"}</p>
+                  <p className="font-medium">{employee.bank_account_type || "—"}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Currency</span>
-                  <p className="font-medium">{employee.currency || "-"}</p>
+                  <p className="font-medium">{employee.currency || "—"}</p>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Employment Details */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -358,15 +432,14 @@ export default function EmployeeDetailPage() {
           </div>
         </TabsContent>
 
-        {/* Attendance, Leave, and Payslip tabs remain completely unchanged */}
+        {/* Attendance Tab */}
         <TabsContent value="attendance">
-          {/* ... same as your original code ... */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Attendance Calendar</CardTitle>
               <Button variant="outline" onClick={loadAttendance} disabled={attendanceLoading}>
                 <RefreshCw className={`mr-2 h-4 w-4 ${attendanceLoading ? "animate-spin" : ""}`} />
-                Refresh Attendance
+                Refresh
               </Button>
             </CardHeader>
             <CardContent className="p-6">
@@ -377,9 +450,9 @@ export default function EmployeeDetailPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded bg-red-500"></div>
-                  <span>Absent (Weekdays only)</span>
+                  <span>Absent (Weekdays)</span>
                 </div>
-                <div className="text-muted-foreground">Sundays are treated as off-days (no marking)</div>
+                <div className="text-muted-foreground">Sundays are off-days</div>
               </div>
 
               <FullCalendar
@@ -395,14 +468,13 @@ export default function EmployeeDetailPage() {
                   center: "title",
                   right: "dayGridMonth,dayGridWeek"
                 }}
-                eventClassNames="fc-event-custom"
               />
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Leave Tab */}
         <TabsContent value="leave">
-          {/* Your original Leave Table - unchanged */}
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -444,8 +516,8 @@ export default function EmployeeDetailPage() {
           </Card>
         </TabsContent>
 
+        {/* Payslip Tab */}
         <TabsContent value="payslip">
-          {/* Your original Payslip section - unchanged */}
           <div className="grid gap-4 sm:grid-cols-3 mb-6">
             {[
               {
@@ -517,7 +589,7 @@ export default function EmployeeDetailPage() {
           <DialogHeader>
             <DialogTitle>Edit Employee Details</DialogTitle>
             <DialogDescription>
-              Update the information for {employee.first_name} {employee.last_name}
+              Update information for {employee.first_name} {employee.last_name}
             </DialogDescription>
           </DialogHeader>
 
@@ -591,26 +663,21 @@ export default function EmployeeDetailPage() {
                 />
               </div>
 
+              {/* Department & Position (Display + Hidden ID) */}
               <div className="space-y-2">
-                <Label htmlFor="position_detail">Position</Label>
-                <Input
-                  id="position_detail"
-                  value={editForm.position_detail}
-                  onChange={(e) => handleInputChange("position_detail", e.target.value)}
-                />
+                <Label>Department</Label>
+                <Input value={editForm.department_detail} disabled />
+                <input type="hidden" value={editForm.department} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="department_detail">Department</Label>
-                <Input
-                  id="department_detail"
-                  value={editForm.department_detail}
-                  onChange={(e) => handleInputChange("department_detail", e.target.value)}
-                />
+                <Label>Position</Label>
+                <Input value={editForm.position_detail} disabled />
+                <input type="hidden" value={editForm.position} />
               </div>
             </div>
 
-            {/* Bank Information Section */}
+            {/* Bank Information */}
             <div className="border-t pt-6">
               <h3 className="text-lg font-medium mb-4">Bank Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -628,6 +695,23 @@ export default function EmployeeDetailPage() {
                     id="bank_account_name"
                     value={editForm.bank_account_name}
                     onChange={(e) => handleInputChange("bank_account_name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank_account_number">Account Number</Label>
+                  <Input
+                    id="bank_account_number"
+                    value={editForm.bank_account_number}
+                    onChange={(e) => handleInputChange("bank_account_number", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank_code">Bank Code</Label>
+                  <Input
+                    id="bank_code"
+                    value={editForm.bank_code}
+                    onChange={(e) => handleInputChange("bank_code", e.target.value)}
+                    placeholder="e.g. 058 (GTBank)"
                   />
                 </div>
                 <div className="space-y-2">
@@ -651,6 +735,7 @@ export default function EmployeeDetailPage() {
                     id="currency"
                     value={editForm.currency}
                     onChange={(e) => handleInputChange("currency", e.target.value)}
+                    placeholder="NGN"
                   />
                 </div>
               </div>

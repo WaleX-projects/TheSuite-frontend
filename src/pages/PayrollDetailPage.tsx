@@ -16,6 +16,18 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Plus, Download, RefreshCw, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 export default function PayrollDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +51,7 @@ export default function PayrollDetailPage() {
       setLoading(true);
       const { data } = await payrollApi.get(id!);
       setPayroll(data);
+      console.log("data from payroll", data)
     } catch (err) {
       toast.error("Failed to load payroll details");
       console.error(err);
@@ -58,26 +71,17 @@ export default function PayrollDetailPage() {
     toast.success("Payroll refreshed");
   };
 
-  // Actions
-  const handleProcess = async () => {
-    try {
-      await payrollApi.process(id!);
-      toast.success("Payroll processed successfully");
-      loadPayroll();
-    } catch {
-      toast.error("Failed to process payroll");
-    }
-  };
+
 
   const handleMarkPaid = async () => {
-    try {
-      await payrollApi.markPaid(id!);
-      toast.success("Payroll marked as paid");
-      loadPayroll();
-    } catch {
-      toast.error("Failed to mark as paid");
-    }
-  };
+  try {
+    await payrollApi.markPaid(id!);
+    toast.success("Payroll marked as paid");
+    loadPayroll();
+  } catch {
+    toast.error("Failed to mark as paid");
+  }
+};
 
   const handleExportCSV = async () => {
     try {
@@ -171,16 +175,49 @@ export default function PayrollDetailPage() {
             <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          {/*
           <Button onClick={handleProcess} disabled={payroll.status !== "draft"}>
             Process Payroll
-          </Button>
-          <Button 
+          </Button>*/}
+      
+          
+          <AlertDialog>
+  <AlertDialogTrigger asChild>
+      <Button 
             variant="secondary" 
-            onClick={handleMarkPaid} 
-            disabled={payroll.status !== "processed"}
+            
+            disabled={payroll.status !== "draft"}
           >
             Mark as Paid
           </Button>
+          
+  </AlertDialogTrigger>
+
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>
+        Mark payroll as paid?
+      </AlertDialogTitle>
+
+      <AlertDialogDescription>
+        This action confirms that employees have been paid.
+        This cannot be easily undone.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+
+    <AlertDialogFooter>
+      <AlertDialogCancel>
+        Cancel
+      </AlertDialogCancel>
+
+      <AlertDialogAction
+        onClick={handleMarkPaid}
+      >
+        Confirm Payment
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
           <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export CSV
@@ -228,7 +265,7 @@ export default function PayrollDetailPage() {
         </Card>
       </div>
 
-      {/* Add New Payslip Button */}
+      {/* Add New Payslip Button 
       <div className="flex justify-end">
         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
           <DialogTrigger asChild>
@@ -287,7 +324,7 @@ export default function PayrollDetailPage() {
           </DialogContent>
         </Dialog>
       </div>
-
+        */}
       {/* Payslips Table */}
       <Card>
         <CardHeader>
@@ -320,7 +357,7 @@ export default function PayrollDetailPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleRow(p.id)}
                     >
-                      <TableCell className="font-medium">{p.employee_name}</TableCell>
+                      <TableCell className="font-medium">{p.employee_detail.full_name}</TableCell>
                       <TableCell>₦{Number(p.basic_salary || 0).toLocaleString()}</TableCell>
                       <TableCell className="text-green-600">
                         +₦{Number(p.total_allowance || 0).toLocaleString()}
