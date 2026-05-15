@@ -124,6 +124,7 @@ export default function EmployeeDetailPage() {
       setAttendanceLoading(true);
       const { data } = await attendanceApi.get(id);
       const records = Array.isArray(data) ? data : data?.results || [];
+      console.log("attendance",records)
       setAttendance(records);
     } catch (err) {
       toast.error("Failed to load attendance records");
