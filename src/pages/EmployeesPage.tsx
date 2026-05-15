@@ -30,11 +30,11 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
 export default function EmployeesPage() {
-  const [employees, setEmployees] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [positions, setPositions] = useState([]);
-  const [filterPositions, setFilterPositions] = useState([]);
-  const [banks, setBanks] = useState([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [positions, setPositions] = useState<any[]>([]);
+  const [filterPositions, setFilterPositions] = useState<any[]>([]);
+  const [banks, setBanks] = useState<any[]>([]);
   const [accountName, setAccountName] = useState("");
 
   const [loading, setLoading] = useState(true);
@@ -46,11 +46,20 @@ export default function EmployeesPage() {
   const [positionFilter, setPositionFilter] = useState("");
 
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const pageSize = 10;
   const [count, setCount] = useState(0);
 
+  // Single Employee Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creationLoading, setCreationLoading] = useState(false);
+
+  // Bulk Upload States
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkPreview, setBulkPreview] = useState<any[]>([]);
+  const [bulkErrors, setBulkErrors] = useState<string[]>([]);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [form, setForm] = useState({
@@ -67,16 +76,9 @@ export default function EmployeesPage() {
     bank_account_number: "",
   });
 
-  const debounceRef = useRef<any>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ================= BULK STATES =================
-  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [bulkFile, setBulkFile] = useState<File | null>(null);
-  const [bulkPreview, setBulkPreview] = useState<any[]>([]);
-  const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ================= LOAD DATA =================
+  // ================= DATA LOADING =================
   const loadEmployees = async () => {
     try {
       setLoadingEmployees(true);
@@ -116,13 +118,9 @@ export default function EmployeesPage() {
     }
   };
 
-  // ================= FORM HANDLERS =================
+  // ================= SINGLE EMPLOYEE HANDLERS =================
   const handleDepartmentChange = async (deptId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      department: deptId,
-      position: "", // Reset position when department changes
-    }));
+    setForm((prev) => ({ ...prev, department: deptId, position: "" }));
 
     if (!deptId) {
       setPositions([]);
@@ -162,10 +160,7 @@ export default function EmployeesPage() {
     if (!bank_code || account_number.length !== 10) return;
 
     try {
-      const { data } = await employeesApi.resolveAccount({
-        bank_code,
-        account_number,
-      });
+      const { data } = await employeesApi.resolveAccount({ bank_code, account_number });
       setAccountName(data.account_name);
       setForm((prev) => ({ ...prev, bank_account_name: data.account_name }));
     } catch {
@@ -198,7 +193,6 @@ export default function EmployeesPage() {
     }));
   };
 
-  // ================= CREATE EMPLOYEE =================
   const handleCreate = async () => {
     if (!form.first_name || !form.last_name || !form.email || !form.department || !form.position) {
       toast.error("Please fill all required fields");
@@ -223,7 +217,6 @@ export default function EmployeesPage() {
       };
 
       await employeesApi.create(payload);
-      
       toast.success("Employee created successfully");
       setDialogOpen(false);
       resetForm();
@@ -231,7 +224,6 @@ export default function EmployeesPage() {
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || "Failed to create employee";
       toast.error(errorMsg);
-      console.error(err.response?.data);
     } finally {
       setCreationLoading(false);
     }
@@ -239,30 +231,50 @@ export default function EmployeesPage() {
 
   const resetForm = () => {
     setForm({
-      first_name: "",
-      last_name: "",
-      email: "",
-      phone: "",
-      hire_date: "",
-      department: "",
-      position: "",
-      bank_name: "",
-      bank_account_name: "",
-      bank_code: "",
-      bank_account_number: "",
+      first_name: "", last_name: "", email: "", phone: "", hire_date: "",
+      department: "", position: "", bank_name: "", bank_account_name: "",
+      bank_code: "", bank_account_number: "",
     });
     setAccountName("");
     setPositions([]);
   };
 
-  // ================= BULK UPLOAD (unchanged logic) =================
+  // ================= BULK UPLOAD =================
+  const downloadTemplate = () => {
+    const template = [
+      {
+        first_name: "John",
+        last_name: "Doe",
+        email: "john.doe@company.com",
+        phone: "08012345678",
+        hire_date: "2025-01-15",
+        department: "Engineering",
+        position: "Software Engineer",
+        bank_name: "GTBank",
+        bank_code: "044",
+        bank_account_number: "0123456789",
+        bank_account_name: "John Doe",
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(template);
+    ws["!cols"] = [
+      { wch: 15 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 12 },
+      { wch: 20 }, { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 25 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Employees");
+    XLSX.writeFile(wb, "employee_bulk_upload_template.xlsx");
+  };
+
   const handleBulkFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // ... (your existing bulk logic - kept as is)
     const file = e.target.files?.[0];
     if (!file) return;
 
     setBulkFile(file);
     setBulkPreview([]);
+    setBulkErrors([]);
 
     const ext = file.name.split(".").pop()?.toLowerCase();
 
@@ -270,7 +282,10 @@ export default function EmployeesPage() {
       Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (result) => setBulkPreview(result.data as any[]),
+        complete: (result) => {
+          setBulkPreview(result.data);
+          validatePreview(result.data);
+        },
       });
     } else if (["xlsx", "xls"].includes(ext || "")) {
       const reader = new FileReader();
@@ -278,26 +293,31 @@ export default function EmployeesPage() {
         const wb = XLSX.read(event.target?.result, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const data = XLSX.utils.sheet_to_json(ws);
-        setBulkPreview(data as any[]);
+        setBulkPreview(data);
+        validatePreview(data);
       };
       reader.readAsArrayBuffer(file);
     } else {
-      toast.error("Only CSV or Excel files are allowed");
+      toast.error("Only CSV or Excel files are supported");
     }
   };
 
-  const downloadTemplate = () => {
-    // Your existing template function - kept unchanged
-    const template = [ /* ... your existing template ... */ ];
-    const ws = XLSX.utils.json_to_sheet(template);
-    ws["!cols"] = [ /* your column widths */ ];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Employee Template");
-    XLSX.writeFile(wb, "employee_upload_template.xlsx");
+  const validatePreview = (data: any[]) => {
+    const errors: string[] = [];
+    data.forEach((row, index) => {
+      if (!row.first_name || !row.last_name || !row.email || !row.department || !row.position) {
+        errors.push(`Row ${index + 2}: Missing required fields`);
+      }
+      if (row.email && !/\S+@\S+\.\S+/.test(row.email)) {
+        errors.push(`Row ${index + 2}: Invalid email format`);
+      }
+    });
+    setBulkErrors(errors);
   };
 
   const handleBulkSubmit = async () => {
     if (!bulkFile) return toast.error("Please select a file");
+    if (bulkErrors.length > 0) return toast.error("Please fix the errors in your file");
 
     setBulkSubmitting(true);
     try {
@@ -319,6 +339,7 @@ export default function EmployeesPage() {
   const resetBulkDialog = () => {
     setBulkFile(null);
     setBulkPreview([]);
+    setBulkErrors([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -335,10 +356,7 @@ export default function EmployeesPage() {
   const totalPages = Math.ceil(count / pageSize);
 
   const handleRegistration = (id: string) => {
-    window.open(
-      `https://walex-projects.github.io/Face_Scan/registration.html?token=${id}`,
-      "_blank"
-    );
+    window.open(`https://walex-projects.github.io/TheSuite-Face_attendance_sys/register?token=${id}`, "_blank");
   };
 
   return (
@@ -358,8 +376,96 @@ export default function EmployeesPage() {
                 <Upload className="mr-2 h-4 w-4" /> Bulk Onboard
               </Button>
             </DialogTrigger>
-            {/* ... Your existing Bulk Dialog Content (unchanged) ... */}
-            {/* Paste your full bulk dialog here if needed */}
+
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Bulk Employee Onboarding</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-6 py-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+                  <p className="font-medium mb-2">Instructions:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Download the template</li>
+                    <li>Fill employee details (use exact department names and position titles)</li>
+                    <li>Upload the completed file</li>
+                  </ol>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button onClick={downloadTemplate} variant="outline">
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Template
+                  </Button>
+
+                  <label>
+                    <Button asChild variant="outline">
+                      <span>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Choose File
+                      </span>
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleBulkFileSelect}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {bulkPreview.length > 0 && (
+                  <div>
+                    <h3 className="font-medium mb-3">Preview ({bulkPreview.length} records)</h3>
+
+                    {bulkErrors.length > 0 && (
+                      <div className="bg-red-50 border border-red-200 p-3 rounded mb-4 text-sm text-red-700">
+                        <strong>Errors:</strong>
+                        <ul className="list-disc pl-5 mt-1 text-xs">
+                          {bulkErrors.slice(0, 6).map((err, i) => <li key={i}>{err}</li>)}
+                          {bulkErrors.length > 6 && <li>...and {bulkErrors.length - 6} more</li>}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="max-h-80 overflow-auto border rounded">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>First Name</TableHead>
+                            <TableHead>Last Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Department</TableHead>
+                            <TableHead>Position</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {bulkPreview.slice(0, 8).map((row, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{row.first_name}</TableCell>
+                              <TableCell>{row.last_name}</TableCell>
+                              <TableCell>{row.email}</TableCell>
+                              <TableCell>{row.department}</TableCell>
+                              <TableCell>{row.position}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  onClick={handleBulkSubmit}
+                  className="w-full"
+                  disabled={bulkSubmitting || !bulkFile || bulkErrors.length > 0}
+                  size="lg"
+                >
+                  {bulkSubmitting ? "Uploading..." : `Upload ${bulkPreview.length} Employees`}
+                </Button>
+              </div>
+            </DialogContent>
           </Dialog>
 
           {/* Add Single Employee */}
@@ -376,22 +482,22 @@ export default function EmployeesPage() {
               </DialogHeader>
 
               <div className="space-y-6 py-2">
-                {/* Personal Info */}
+                {/* Personal Information */}
                 <div className="space-y-4">
                   <h3 className="font-medium">Personal Information</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>First Name <span className="text-red-500">*</span></Label>
-                      <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required />
+                      <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
                     </div>
                     <div>
                       <Label>Last Name <span className="text-red-500">*</span></Label>
-                      <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
+                      <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
                     </div>
                   </div>
                   <div>
                     <Label>Email <span className="text-red-500">*</span></Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                   </div>
                   <div>
                     <Label>Phone</Label>
@@ -399,17 +505,12 @@ export default function EmployeesPage() {
                   </div>
                 </div>
 
-                {/* Job Info */}
+                {/* Job Information */}
                 <div className="space-y-4">
                   <h3 className="font-medium">Job Information</h3>
                   <div>
                     <Label>Department <span className="text-red-500">*</span></Label>
-                    <select
-                      value={form.department}
-                      onChange={(e) => handleDepartmentChange(e.target.value)}
-                      className="w-full border rounded-md p-2"
-                      required
-                    >
+                    <select value={form.department} onChange={(e) => handleDepartmentChange(e.target.value)} className="w-full border rounded-md p-2">
                       <option value="">Select Department</option>
                       {departments.map((d: any) => (
                         <option key={d.id} value={d.id}>{d.name}</option>
@@ -419,13 +520,7 @@ export default function EmployeesPage() {
 
                   <div>
                     <Label>Position <span className="text-red-500">*</span></Label>
-                    <select
-                      value={form.position}
-                      onChange={(e) => setForm({ ...form, position: e.target.value })}
-                      className="w-full border rounded-md p-2"
-                      disabled={!form.department || loadingPositions}
-                      required
-                    >
+                    <select value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} className="w-full border rounded-md p-2" disabled={!form.department}>
                       <option value="">{loadingPositions ? "Loading..." : "Select Position"}</option>
                       {positions.map((p: any) => (
                         <option key={p.id} value={p.id}>{p.title}</option>
@@ -439,7 +534,7 @@ export default function EmployeesPage() {
                   </div>
                 </div>
 
-                {/* Bank Info */}
+                {/* Bank Information */}
                 <div className="space-y-4">
                   <h3 className="font-medium">Bank Information</h3>
                   <div>
@@ -464,13 +559,13 @@ export default function EmployeesPage() {
 
                   {accountName && (
                     <div className="bg-green-50 border border-green-200 rounded p-3 text-sm">
-                      <strong>Verified Account Name:</strong> {accountName}
+                      <strong>Verified:</strong> {accountName}
                     </div>
                   )}
                 </div>
 
                 <Button onClick={handleCreate} className="w-full" disabled={creationLoading} size="lg">
-                  {creationLoading ? "Creating Employee..." : "Create Employee"}
+                  {creationLoading ? "Creating..." : "Create Employee"}
                 </Button>
               </div>
             </DialogContent>
@@ -505,7 +600,7 @@ export default function EmployeesPage() {
         </select>
       </div>
 
-      {/* Table */}
+      {/* Employees Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -533,10 +628,10 @@ export default function EmployeesPage() {
                   <TableRow key={e.id}>
                     <TableCell className="font-medium">{e.first_name} {e.last_name}</TableCell>
                     <TableCell>{e.email}</TableCell>
-                    <TableCell>{e.position_detail || "-"}</TableCell>
+                    <TableCell>{e.position_detail || e.position?.title || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={e.status === "active" ? "default" : "secondary"}>
-                        {e.status}
+                        {e.status || "inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -546,7 +641,7 @@ export default function EmployeesPage() {
                     </TableCell>
                     <TableCell>
                       {!e.face_verified && (
-                        <Button variant="outline" size="sm" onClick={() => handleRegistration(e.id)}>
+                        <Button variant="outline" size="sm" onClick={() => handleRegistration(e.employee_id || e.id)}>
                           Verify Face
                         </Button>
                       )}
@@ -562,11 +657,15 @@ export default function EmployeesPage() {
       {/* Pagination */}
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          Page {page} of {totalPages}
+          Page {page} of {totalPages || 1}
         </p>
         <div className="flex gap-2">
-          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          <Button variant="outline" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+          <Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+            Previous
+          </Button>
+          <Button variant="outline" disabled={page === totalPages || totalPages === 0} onClick={() => setPage(p => p + 1)}>
+            Next
+          </Button>
         </div>
       </div>
     </div>

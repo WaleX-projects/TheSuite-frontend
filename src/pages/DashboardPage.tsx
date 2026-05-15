@@ -118,7 +118,7 @@ export default function DashboardPage() {
           <Button onClick={fetchDashboardStats} variant="outline" size="sm">
             Refresh
           </Button>
-          <Button size="sm">View Reports</Button>
+          
         </div>
       </div>
 
@@ -180,7 +180,7 @@ export default function DashboardPage() {
 
       {/* Quick Links / Next Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Attendance Overview Card */}
+        {/* Attendance Overview Card 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export default function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
-
+*/}
         {/* Recent Activity */}
         <Card>
           <CardHeader>

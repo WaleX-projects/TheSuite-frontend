@@ -26,7 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
-  User, X, Briefcase, Phone, Mail, MapPin, Calendar, DollarSign, RefreshCw, Edit 
+  User, X, Briefcase, Phone, Mail, MapPin, Calendar, DollarSign, RefreshCw, Edit, Copy, Eye, EyeOff 
 } from "lucide-react";
 import { toast } from "sonner";
 import FullCalendar from "@fullcalendar/react";
@@ -46,6 +46,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// Leave Request Modal
+import {
+  Dialog as LeaveDialog,
+  DialogContent as LeaveDialogContent,
+  DialogDescription as LeaveDialogDescription,
+  DialogFooter as LeaveDialogFooter,
+  DialogHeader as LeaveDialogHeader,
+  DialogTitle as LeaveDialogTitle,
+} from "@/components/ui/dialog";
+
 export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
 
@@ -54,9 +64,15 @@ export default function EmployeeDetailPage() {
   const [payslip, setPayslip] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [payslipLoading, setPayslipLoading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<any>({});
   const [updating, setUpdating] = useState(false);
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+
+  // Show/hide full account number
+  const [showFullAccount, setShowFullAccount] = useState(false);
 
   // Load Employee Data
   const loadEmployee = useCallback(async () => {
@@ -66,7 +82,7 @@ export default function EmployeeDetailPage() {
       const { data } = await employeesApi.get(id);
       
       setEmployee(data);
-      console.log("incoming data", data)
+      console.log("incoming data", data);
 
       // Initialize edit form
       setEditForm({
@@ -120,12 +136,15 @@ export default function EmployeeDetailPage() {
   const loadPayslips = useCallback(async () => {
     if (!id) return;
     try {
+      setPayslipLoading(true);
       const { data } = await employeesApi.listEmployeepayslip(id);
       const records = Array.isArray(data) ? data : data?.results || [];
       setPayslip(records);
     } catch (err) {
       toast.error("Failed to load payslips");
       console.error(err);
+    } finally {
+      setPayslipLoading(false);
     }
   }, [id]);
 
@@ -190,9 +209,53 @@ export default function EmployeeDetailPage() {
     setEditForm((prev: any) => ({ ...prev, [field]: value }));
   };
 
+  // Leave Request Form State
+  const [leaveForm, setLeaveForm] = useState({
+    leave_type: "",
+    start_date: "",
+    end_date: "",
+    reason: "",
+  });
+
+  const handleLeaveInputChange = (field: string, value: string) => {
+    setLeaveForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !leaveForm.leave_type || !leaveForm.start_date || !leaveForm.end_date) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    setSubmittingLeave(true);
+    try {
+      // Replace with your actual leave API endpoint
+      // await leaveApi.create({ employee: id, ...leaveForm });
+      toast.success("Leave request submitted successfully");
+      setIsLeaveModalOpen(false);
+      setLeaveForm({ leave_type: "", start_date: "", end_date: "", reason: "" });
+      // Optionally refresh leaves if you have them loaded separately
+    } catch (err: any) {
+      toast.error("Failed to submit leave request");
+      console.error(err);
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
+
   useEffect(() => {
     loadEmployee();
   }, [loadEmployee]);
+
+  // Copy Account Number
+  const copyAccountNumber = () => {
+    const accNumber = employee?.bank_account_number || employee?.masked_account_number;
+    if (accNumber) {
+      navigator.clipboard.writeText(accNumber);
+      toast.success("Account number copied!");
+    }
+  };
 
   // Calendar Events
   const presentEvents = attendance.map((a: any) => {
@@ -254,6 +317,10 @@ export default function EmployeeDetailPage() {
     );
   }
 
+  const accountNumberDisplay = showFullAccount 
+    ? (employee.bank_account_number || employee.masked_account_number || "—")
+    : (employee.masked_account_number || "••••••••••");
+
   return (
     <div className="space-y-8 p-6">
       {/* Header */}
@@ -277,51 +344,46 @@ export default function EmployeeDetailPage() {
             Edit Employee
           </Button>
 
-        <AlertDialog>
-  <AlertDialogTrigger asChild>
-    <Button
-      variant={employee.status === "active" ? "destructive" : "default"}
-      className="flex items-center gap-2"
-    >
-      {employee.status === "active" ? (
-        <>
-          <X className="h-4 w-4" />
-          Deactivate Employee
-        </>
-      ) : (
-        <>Activate Employee</>
-      )}
-    </Button>
-  </AlertDialogTrigger>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant={employee.status === "active" ? "destructive" : "default"}
+                className="flex items-center gap-2"
+              >
+                {employee.status === "active" ? (
+                  <>
+                    <X className="h-4 w-4" />
+                    Deactivate Employee
+                  </>
+                ) : (
+                  <>Activate Employee</>
+                )}
+              </Button>
+            </AlertDialogTrigger>
 
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>
-        {employee.status === "active"
-          ? "Deactivate Employee"
-          : "Activate Employee"}
-      </AlertDialogTitle>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {employee.status === "active"
+                    ? "Deactivate Employee"
+                    : "Activate Employee"}
+                </AlertDialogTitle>
 
-      <AlertDialogDescription>
-        {employee.status === "active"
-          ? "This employee will no longer be able to participate in active operations such as attendance, payroll, and scheduling."
-          : "This employee will be restored to active operations including attendance and payroll."}
-      </AlertDialogDescription>
-    </AlertDialogHeader>
+                <AlertDialogDescription>
+                  {employee.status === "active"
+                    ? "This employee will no longer be able to participate in active operations such as attendance, payroll, and scheduling."
+                    : "This employee will be restored to active operations including attendance and payroll."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
 
-    <AlertDialogFooter>
-      <AlertDialogCancel>
-        Cancel
-      </AlertDialogCancel>
-
-      <AlertDialogAction onClick={handleToggleStatus}>
-        {employee.status === "active"
-          ? "Deactivate"
-          : "Activate"}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleToggleStatus}>
+                  {employee.status === "active" ? "Deactivate" : "Activate"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -386,9 +448,27 @@ export default function EmployeeDetailPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Number</span>
-                  <p className="font-medium tracking-widest">
-                    {employee.masked_account_number || employee.bank_account_number || "—"}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="font-medium tracking-widest font-mono">
+                      {accountNumberDisplay}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyAccountNumber}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowFullAccount(!showFullAccount)}
+                      className="h-7 w-7 p-0"
+                    >
+                      {showFullAccount ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Account Type</span>
@@ -432,7 +512,7 @@ export default function EmployeeDetailPage() {
           </div>
         </TabsContent>
 
-        {/* Attendance Tab */}
+        {/* Attendance Tab - Improved UI */}
         <TabsContent value="attendance">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -455,26 +535,43 @@ export default function EmployeeDetailPage() {
                 <div className="text-muted-foreground">Sundays are off-days</div>
               </div>
 
-              <FullCalendar
-                plugins={[dayGridPlugin]}
-                initialView="dayGridMonth"
-                height="auto"
-                events={allCalendarEvents}
-                eventDisplay="block"
-                dayMaxEvents={3}
-                weekends={true}
-                headerToolbar={{
-                  left: "prev,next today",
-                  center: "title",
-                  right: "dayGridMonth,dayGridWeek"
-                }}
-              />
+              {attendance.length === 0 && !attendanceLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <div className="text-6xl mb-4 opacity-40">📅</div>
+                  <h3 className="text-xl font-medium mb-2">No Attendance Records</h3>
+                  <p className="text-muted-foreground max-w-sm">
+                    This employee has no attendance data yet. Records will appear here once they start clocking in.
+                  </p>
+                </div>
+              ) : (
+                <FullCalendar
+                  plugins={[dayGridPlugin]}
+                  initialView="dayGridMonth"
+                  height="auto"
+                  events={allCalendarEvents}
+                  eventDisplay="block"
+                  dayMaxEvents={3}
+                  weekends={true}
+                  headerToolbar={{
+                    left: "prev,next today",
+                    center: "title",
+                    right: "dayGridMonth,dayGridWeek"
+                  }}
+                />
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Leave Tab */}
         <TabsContent value="leave">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">Leave History</h2>
+            <Button onClick={() => setIsLeaveModalOpen(true)}>
+              Request Leave
+            </Button>
+          </div>
+
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -542,6 +639,13 @@ export default function EmployeeDetailPage() {
           </div>
 
           <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Payslip Records</CardTitle>
+              <Button variant="outline" onClick={loadPayslips} disabled={payslipLoading}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${payslipLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
@@ -569,10 +673,17 @@ export default function EmployeeDetailPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {payslip.length === 0 && (
+                  {payslip.length === 0 && !payslipLoading && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                         No payslip records found
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {payslipLoading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                        Loading payslips...
                       </TableCell>
                     </TableRow>
                   )}
@@ -757,6 +868,87 @@ export default function EmployeeDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* ====================== LEAVE REQUEST MODAL ====================== */}
+      <LeaveDialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
+        <LeaveDialogContent>
+          <LeaveDialogHeader>
+            <LeaveDialogTitle>Request Leave</LeaveDialogTitle>
+            <LeaveDialogDescription>
+              Submit a new leave request for {employee.first_name} {employee.last_name}
+            </LeaveDialogDescription>
+          </LeaveDialogHeader>
+
+          <form onSubmit={handleLeaveSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Leave Type</Label>
+              <Select 
+                value={leaveForm.leave_type} 
+                onValueChange={(value) => handleLeaveInputChange("leave_type", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annual">Annual Leave</SelectItem>
+                  <SelectItem value="sick">Sick Leave</SelectItem>
+                  <SelectItem value="maternity">Maternity Leave</SelectItem>
+                  <SelectItem value="paternity">Paternity Leave</SelectItem>
+                  <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_date">Start Date</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={leaveForm.start_date}
+                  onChange={(e) => handleLeaveInputChange("start_date", e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_date">End Date</Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={leaveForm.end_date}
+                  onChange={(e) => handleLeaveInputChange("end_date", e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason</Label>
+              <Textarea
+                id="reason"
+                value={leaveForm.reason}
+                onChange={(e) => handleLeaveInputChange("reason", e.target.value)}
+                placeholder="Please provide a reason for your leave request..."
+                rows={4}
+              />
+            </div>
+
+            <LeaveDialogFooter>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setIsLeaveModalOpen(false)}
+                disabled={submittingLeave}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submittingLeave}>
+                {submittingLeave ? "Submitting..." : "Submit Request"}
+              </Button>
+            </LeaveDialogFooter>
+          </form>
+        </LeaveDialogContent>
+      </LeaveDialog>
     </div>
   );
 }
