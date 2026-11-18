@@ -38,6 +38,7 @@ import AihelperPage from "@/pages/AihelperPage";
 //import PolicyDetailPage from "@/pages/PolicyDetailPage"
 import PayrollReportPage from "@/pages/PayrollReport";
 import EmployeeSalaryOverridesPage from "@/pages/EmployeeSalaryOverridesPage";
+import LandingPage from "@/pages/LandingPage";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -62,7 +63,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
